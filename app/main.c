@@ -9,7 +9,7 @@
 int main(int argc, char **argv)
 {
 
-  //Next steps: start built in commands, get rid of the switch case, so the shell starts without any argument
+  //Next steps: start built in commands, get rid of the switch case, so the shell starts without any argument (unless -v)
 
   //set prompt
   char *prompt = get_prompt("MY_PROMPT");
