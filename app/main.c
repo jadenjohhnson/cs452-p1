@@ -8,12 +8,12 @@
 
 int main(int argc, char **argv)
 {
-  // printf("hello world\n");
 
-  //set prompt for when shell is started
-  setenv("MY_PROMPT", "(.)(.)", 1);
-  char *prompt = getenv("MY_PROMPT");
-  
+  //Next steps: start built in commands, get rid of the switch case, so the shell starts without any argument
+
+  //set prompt
+  char *prompt = get_prompt("MY_PROMPT");
+
   int c;
   char *line;
   while((c = getopt (argc, argv, "abcvt" )) != -1)
@@ -35,7 +35,6 @@ int main(int argc, char **argv)
         return -1;
         break;
       case 't':
-        //I will be testing readline here, just tryin to print what I type
         using_history();
         while ((line=readline(prompt))){
           if (strcmp(line, "exit") == 0) {
@@ -55,5 +54,7 @@ int main(int argc, char **argv)
       default:
         printf("reached default");
     }
+
+  free(prompt);
   return 0;
 }
