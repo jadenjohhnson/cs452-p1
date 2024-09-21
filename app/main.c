@@ -9,8 +9,6 @@
 int main(int argc, char **argv)
 {
 
-  //Next steps: start built in commands, get rid of the switch case, so the shell starts without any argument (unless -v)
-
   //set prompt
   char *prompt = get_prompt("MY_PROMPT");
 
@@ -31,11 +29,28 @@ int main(int argc, char **argv)
 
   using_history();
   while ((line = readline(prompt)) != NULL){
-    if (strcmp(line, "exit") == 0) {
-        free(line);
-        break;
-    }
-    printf("%s\n", line);
+    // if (strcmp(line, "exit") == 0) {
+    //     free(line);
+    //     break;
+    // }
+
+    char *lineTrimmed = trim_white(line);
+    char **args = cmd_parse(lineTrimmed);
+
+    // if (args[0] != NULL) {
+    //   if (strcmp(args[0], "cd") == 0) {
+    //       change_dir(&args[1]);
+    //   } else {
+    //       // this location is for when next commands get implemented
+    //       printf("Command not implemented: %s\n", args[0]);
+    //     }
+    // }
+    // printf("%s\n", line);
+
+    if (!do_builtin(sh, args)) {
+    // Handle external command (fork, exec, etc.)
+}
+    cmd_free(args);
     add_history(line);
     free(line);
   }
