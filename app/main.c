@@ -8,9 +8,9 @@
 
 int main(int argc, char **argv)
 {
-
-  //set prompt
-  char *prompt = get_prompt("MY_PROMPT");
+  // Initialize shell
+  struct shell theShell;
+  sh_init(&theShell);
 
   int c;
   char *line;
@@ -20,7 +20,7 @@ int main(int argc, char **argv)
       case 'v':
       //This is step 1: print the lab version number
         printf("Lab Version is: %d.%d\n", lab_VERSION_MAJOR, lab_VERSION_MINOR);
-        free(prompt);
+        sh_destroy(&theShell);
         return -1;
         break;
       default:
@@ -28,32 +28,22 @@ int main(int argc, char **argv)
     }
 
   using_history();
-  while ((line = readline(prompt)) != NULL){
-    // if (strcmp(line, "exit") == 0) {
-    //     free(line);
-    //     break;
-    // }
+  while ((line = readline(theShell.prompt)) != NULL){
+
+    if (strlen(line) > 0) {
+      add_history(line);  // Add non-empty lines to history
+    }
 
     char *lineTrimmed = trim_white(line);
     char **args = cmd_parse(lineTrimmed);
 
-    // if (args[0] != NULL) {
-    //   if (strcmp(args[0], "cd") == 0) {
-    //       change_dir(&args[1]);
-    //   } else {
-    //       // this location is for when next commands get implemented
-    //       printf("Command not implemented: %s\n", args[0]);
-    //     }
-    // }
-    // printf("%s\n", line);
-
-    if (!do_builtin(sh, args)) {
+    if (!do_builtin(&theShell, args)) {
     // Handle external command (fork, exec, etc.)
-}
+    }
     cmd_free(args);
-    add_history(line);
     free(line);
   }
-  free(prompt);
+
+  sh_destroy(&theShell);
   return 0;
 }

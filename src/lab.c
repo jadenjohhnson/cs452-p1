@@ -4,6 +4,11 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <termios.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 char *get_prompt(const char *env){
 
@@ -90,15 +95,16 @@ char *trim_white(char *line) {
 }
 
 bool do_builtin(struct shell *sh, char **argv) {
-    if (argv == NULL || argv[0] == NULL) {
+    if (sh == NULL || argv == NULL || argv[0] == NULL) {
+        fprintf(stderr, "Error: Invalid arguments to do_builtin\n");
         return false;
     }
 
     if (strcmp(argv[0], "exit") == 0) {
-        // Exit command
+        printf("Exiting shell...\n");
+        sh_destroy(sh);
         exit(0);
     } else if (strcmp(argv[0], "cd") == 0) {
-        // cd command
         if (change_dir(&argv[1]) == 0) {
             char cwd[1024];
             if (getcwd(cwd, sizeof(cwd)) != NULL) {
@@ -111,7 +117,6 @@ bool do_builtin(struct shell *sh, char **argv) {
         }
         return true;
     } else if (strcmp(argv[0], "pwd") == 0) {
-        // pwd command
         char cwd[1024];
         if (getcwd(cwd, sizeof(cwd)) != NULL) {
             printf("%s\n", cwd);
@@ -119,7 +124,101 @@ bool do_builtin(struct shell *sh, char **argv) {
             perror("getcwd() error");
         }
         return true;
+    } else if (strcmp(argv[0], "history") == 0) {
+        HIST_ENTRY **hist_list = history_list();
+        if (hist_list) {
+            for (int i = 0; hist_list[i]; i++) {
+                printf("%d: %s\n", i + 1, hist_list[i]->line);
+            }
+        } else {
+            printf("No command history available.\n");
+        }
+        return true;
+    } else if (strcmp(argv[0], "help") == 0) {
+        printf("Built-in commands:\n");
+        printf("  exit - Exit the shell\n");
+        printf("  cd [dir] - Change directory\n");
+        printf("  pwd - Print current working directory\n");
+        printf("  history - Display command history\n");
+        printf("  help - Display this help message\n");
+        return true;
     }
-    fprint("Not a built in function");
+
     return false;
+}
+
+void sh_init(struct shell *sh) {
+    if (sh == NULL) {
+        fprintf(stderr, "Error: Shell struct is NULL\n");
+        exit(1);
+    }
+
+    // Initialize shell members
+    sh->shell_terminal = STDIN_FILENO;
+    sh->shell_is_interactive = isatty(sh->shell_terminal);
+
+    if (sh->shell_is_interactive) {
+        // Loop until we are in the foreground
+        while (tcgetpgrp(sh->shell_terminal) != (sh->shell_pgid = getpgrp())) {
+            kill(-sh->shell_pgid, SIGTTIN);
+        }
+
+        // Ignore interactive and job-control signals
+        signal(SIGINT, SIG_IGN);
+        signal(SIGQUIT, SIG_IGN);
+        signal(SIGTSTP, SIG_IGN);
+        signal(SIGTTIN, SIG_IGN);
+        signal(SIGTTOU, SIG_IGN);
+        signal(SIGCHLD, SIG_IGN);
+
+        // Put ourselves in our own process group
+        sh->shell_pgid = getpid();
+        if (setpgid(sh->shell_pgid, sh->shell_pgid) < 0) {
+            perror("Couldn't put the shell in its own process group");
+            exit(1);
+        }
+
+        // Grab control of the terminal
+        tcsetpgrp(sh->shell_terminal, sh->shell_pgid);
+
+        // Save default terminal attributes for shell
+        tcgetattr(sh->shell_terminal, &sh->shell_tmodes);
+    }
+
+    // Set up the prompt
+    sh->prompt = get_prompt("MY_PROMPT");
+}
+
+void sh_destroy(struct shell *sh) {
+    if (sh == NULL) {
+        return;  // Nothing to do if shell is NULL
+    }
+
+    // Free the prompt if it was allocated
+    if (sh->prompt != NULL) {
+        free(sh->prompt);
+        sh->prompt = NULL;
+    }
+
+    // If the shell is interactive, restore the terminal settings
+    if (sh->shell_is_interactive) {
+        // Restore default signal handlers
+        signal(SIGINT, SIG_DFL);
+        signal(SIGQUIT, SIG_DFL);
+        signal(SIGTSTP, SIG_DFL);
+        signal(SIGTTIN, SIG_DFL);
+        signal(SIGTTOU, SIG_DFL);
+        signal(SIGCHLD, SIG_DFL);
+
+        // Restore the terminal attributes
+        tcsetattr(sh->shell_terminal, TCSADRAIN, &sh->shell_tmodes);
+
+        // Give control of the terminal back to the default process group
+        tcsetpgrp(sh->shell_terminal, tcgetpgrp(sh->shell_terminal));
+    }
+
+    // Reset all shell structure members
+    sh->shell_terminal = -1;
+    sh->shell_is_interactive = 0;
+    sh->shell_pgid = -1;
 }
