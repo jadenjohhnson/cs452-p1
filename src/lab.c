@@ -244,6 +244,7 @@ void sh_destroy(struct shell *sh) {
         } else { // Parent process
             // Wait for the child process to complete
             if (waitpid(pid, &status, 0) == -1) {
+                printf("waiting rn\n");
                 perror("waitpid");
                 return -1;
             }
@@ -255,5 +256,6 @@ void sh_destroy(struct shell *sh) {
             }
         }
     }
+    printf("returning external\n");
     return 0;
 }

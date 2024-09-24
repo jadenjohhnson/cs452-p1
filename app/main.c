@@ -43,9 +43,13 @@ int main(int argc, char **argv)
 
       if (externResult != 0) {
             fprintf(stderr, "External Command failed, status: %d\n", externResult);
+        } else {
+        // fflush(stdout);
+        // printf("%s\n", stdout);
+        // printf("%s\n",readline(NULL));
+        printf("should print here\n");
+        // printf("%s", theShell.prompt);
         }
-    
-      // printf("%s", theShell.prompt);
     }
 
     cmd_free(args);
