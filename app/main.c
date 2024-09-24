@@ -38,8 +38,18 @@ int main(int argc, char **argv)
     char **args = cmd_parse(lineTrimmed);
 
     if (!do_builtin(&theShell, args)) {
-    // Handle external command (fork, exec, etc.)
+      
+      //Time for an external command!
+      printf("\n");
+      int externResult = externalCommand(args);
+
+      if (externResult != 0) {
+            fprintf(stderr, "External Command failed, status: %d\n", externResult);
+        }
+    
+      // printf("%s", theShell.prompt);
     }
+
     cmd_free(args);
     free(line);
   }

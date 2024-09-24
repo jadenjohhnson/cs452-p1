@@ -120,7 +120,12 @@ extern "C"
    */
   void parse_args(int argc, char **argv);
 
-
+  /**
+   * @brief Exectute commands if they are not built into the shell
+   *
+   * @param args The external arguments
+   */
+  int externalCommand(char **args);
 
 #ifdef __cplusplus
 } // extern "C"

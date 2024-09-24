@@ -9,6 +9,7 @@
 #include <termios.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <sys/wait.h>
 
 char *get_prompt(const char *env){
 
@@ -221,4 +222,38 @@ void sh_destroy(struct shell *sh) {
     sh->shell_terminal = -1;
     sh->shell_is_interactive = 0;
     sh->shell_pgid = -1;
+}
+
+  int externalCommand(char **args) {
+
+    // Since the command was not built in, a new process must be created  
+    pid_t pid;
+    int status;
+
+    pid = fork();
+
+    if (pid == 0) { // Child process
+
+        // Execute the command using execvp
+        if (execvp(args[0], args) == -1) {
+            perror("execvp");
+            exit(EXIT_FAILURE);
+        } else if (pid < 0) { // Fork failed
+            perror("fork");
+            return -1;
+        } else { // Parent process
+            // Wait for the child process to complete
+            if (waitpid(pid, &status, 0) == -1) {
+                perror("waitpid");
+                return -1;
+            }
+
+            if (WIFEXITED(status)) {
+                return WEXITSTATUS(status);
+            } else {
+                return -1;
+            }
+        }
+    }
+    return 0;
 }
