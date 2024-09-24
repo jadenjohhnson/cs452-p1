@@ -38,9 +38,7 @@ int main(int argc, char **argv)
     char **args = cmd_parse(lineTrimmed);
 
     if (!do_builtin(&theShell, args)) {
-      
       //Time for an external command!
-      printf("\n");
       int externResult = externalCommand(args);
 
       if (externResult != 0) {
