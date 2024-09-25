@@ -125,7 +125,7 @@ extern "C"
    *
    * @param args The external arguments
    */
-  int externalCommand(char **args);
+  int externalCommand(struct shell *sh, char **args);
 
 #ifdef __cplusplus
 } // extern "C"

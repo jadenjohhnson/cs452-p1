@@ -225,45 +225,7 @@ void sh_destroy(struct shell *sh) {
     sh->shell_pgid = -1;
 }
 
-//   int externalCommand(char **args) {
-
-//     // Since the command was not built in, a new process must be created  
-//     pid_t pid;
-//     int status;
-
-//     pid = fork();
-
-//     if (pid == 0) { // Child process
-
-//         // Execute the command using execvp
-//         if (execvp(args[0], args) == -1) {
-//             perror("execvp");
-//             exit(EXIT_FAILURE);
-//         } 
-//         else if (pid < 0) { // Fork failed
-//             perror("fork");
-//             return -1;
-//         } 
-//         else { // Parent process
-//             // Wait for the child process to complete
-//             if (waitpid(pid, &status, 0) == -1) {
-//                 printf("waiting rn\n");
-//                 perror("waitpid");
-//                 return -1;
-//             }
-
-//             if (WIFEXITED(status)) {
-//                 return WEXITSTATUS(status);
-//             } else {
-//                 return -1;
-//             }
-//         }
-//     }
-//     // printf("returning external\n");
-//     return 0;
-// }
-
-int externalCommand(char **args) {
+int externalCommand(struct shell *sh, char **args) {
     pid_t pid;
     int status;
 
@@ -273,25 +235,61 @@ int externalCommand(char **args) {
         perror("fork");
         return -1;
     } else if (pid == 0) { // Child process
-        // Execute the command using execvp
-        if (execvp(args[0], args) == -1) {
-            perror("execvp");
-            exit(EXIT_FAILURE);
-        }
+        // Set up the child process
+        pid_t child = getpid();
+        setpgid(child, child);
+        tcsetpgrp(sh->shell_terminal, child);
+
+        // Reset signal handlers to default
+        signal(SIGINT, SIG_DFL);
+        signal(SIGQUIT, SIG_DFL);
+        signal(SIGTSTP, SIG_DFL);
+        signal(SIGTTIN, SIG_DFL);
+        signal(SIGTTOU, SIG_DFL);
+
+        // Execute the command
+        execvp(args[0], args);
+        
+        // If execvp returns, it must have failed
+        fprintf(stderr, "exec failed\n");
+        exit(EXIT_FAILURE);
     } else { // Parent process
+
+        // Put the child in its own process group
+        setpgid(pid, pid);
+
+        // Give terminal control to the child process
+        tcsetpgrp(sh->shell_terminal, pid);
+
         // Wait for the child process to complete
-        if (waitpid(pid, &status, 0) == -1) {
+            //Note: WUNTRACED is to catch stopped processes
+        if (waitpid(pid, &status, WUNTRACED) == -1) {
             if (errno == ECHILD) {
                 // Child has already terminated
                 return 0;  // Assume success if we can't get the actual status
             }
-            printf("waitPIDERR\n");
             perror("waitpid");
             return -1;
         }
 
+        // Give control back to the shell
+        tcsetpgrp(sh->shell_terminal, sh->shell_pgid);
+
+        // Reset signal handlers for the shell
+        signal(SIGINT, SIG_IGN);
+        signal(SIGQUIT, SIG_IGN);
+        signal(SIGTSTP, SIG_IGN);
+        signal(SIGTTIN, SIG_IGN);
+        signal(SIGTTOU, SIG_IGN);
+
         if (WIFEXITED(status)) {
             return WEXITSTATUS(status);
+        } else if (WIFSIGNALED(status)) {
+            fprintf(stderr, "Child process terminated by signal %d\n", WTERMSIG(status));
+            return -1;
+        }else if (WIFSTOPPED(status)) {
+            fprintf(stderr, "Child process stopped by signal %d\n", WSTOPSIG(status));
+            return -1;
         }
     }
     return 0; // This should not be reached

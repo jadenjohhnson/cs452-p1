@@ -39,16 +39,11 @@ int main(int argc, char **argv)
 
     if (!do_builtin(&theShell, args)) {
       //Time for an external command!
-      int externResult = externalCommand(args);
+      int externResult = externalCommand(&theShell, args);
 
       if (externResult != 0) {
             fprintf(stderr, "External Command failed, status: %d\n", externResult);
         } else {
-        // fflush(stdout);
-        // printf("%s\n", stdout);
-        // printf("%s\n",readline(NULL));
-        // printf("should print here\n");
-        // printf("%s", theShell.prompt);
         }
     }
 
