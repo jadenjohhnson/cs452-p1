@@ -35,6 +35,11 @@ int main(int argc, char **argv)
     }
 
     char *lineTrimmed = trim_white(line);
+    if (strlen(lineTrimmed) == 0) {
+      free(line);
+      free(lineTrimmed); // Free the trimmed line if it was dynamically allocated
+      continue; // Skip to the next iteration
+    }
     char **args = cmd_parse(lineTrimmed);
 
     if (!do_builtin(&theShell, args)) {
