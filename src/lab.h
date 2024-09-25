@@ -15,6 +15,16 @@ extern "C"
 {
 #endif
 
+  // Add these to lab.h
+  #define MAX_JOBS 20
+
+  struct job {
+      int id;
+      pid_t pid;
+      char *command;
+      int is_background;
+  };
+
   struct shell
   {
     int shell_is_interactive;
@@ -22,6 +32,8 @@ extern "C"
     struct termios shell_tmodes;
     int shell_terminal;
     char *prompt;
+    struct job jobs[MAX_JOBS];
+    int job_count;
   };
 
 
@@ -126,6 +138,23 @@ extern "C"
    * @param args The external arguments
    */
   int externalCommand(struct shell *sh, char **args);
+
+// Add these function prototypes to lab.h
+
+/**
+ * TODO
+ */
+void add_job(struct shell *sh, pid_t pid, char *command, int is_background);
+
+/**
+ * TODO
+ */
+void check_background_jobs(struct shell *sh);
+
+/**
+ * TODO
+ */
+void remove_job(struct shell *sh, int job_id);
 
 #ifdef __cplusplus
 } // extern "C"

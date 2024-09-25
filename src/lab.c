@@ -82,10 +82,10 @@ char *trim_white(char *line) {
 
   while(isspace((unsigned char)*line)) line++;
 
-    // If the line is all whitespace, return an empty string
-    if (*line == 0) {
-        return strdup("");  // Allocate and return an empty string
-    }
+// If the line is all whitespace, return an empty string
+if (*line == 0) {
+    return strdup("");  // Allocate and return an empty string
+}
 
   char *lineEnd = line + strlen(line) -1;
   while(lineEnd > line && isspace((unsigned char) *lineEnd)){
