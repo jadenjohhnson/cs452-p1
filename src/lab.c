@@ -238,7 +238,6 @@ int externalCommand(struct shell *sh, char **args) {
         // Set up the child process
         pid_t child = getpid();
         setpgid(child, child);
-        tcsetpgrp(sh->shell_terminal, child);
 
         // Reset signal handlers to default
         signal(SIGINT, SIG_DFL);
@@ -254,16 +253,8 @@ int externalCommand(struct shell *sh, char **args) {
         fprintf(stderr, "exec failed\n");
         exit(EXIT_FAILURE);
     } else { // Parent process
-
-        // Put the child in its own process group
-        setpgid(pid, pid);
-
-        // Give terminal control to the child process
-        tcsetpgrp(sh->shell_terminal, pid);
-
         // Wait for the child process to complete
-            //Note: WUNTRACED is to catch stopped processes
-        if (waitpid(pid, &status, WUNTRACED) == -1) {
+        if (waitpid(pid, &status, 0) == -1) {
             if (errno == ECHILD) {
                 // Child has already terminated
                 return 0;  // Assume success if we can't get the actual status
@@ -275,20 +266,11 @@ int externalCommand(struct shell *sh, char **args) {
         // Give control back to the shell
         tcsetpgrp(sh->shell_terminal, sh->shell_pgid);
 
-        // Reset signal handlers for the shell
-        signal(SIGINT, SIG_IGN);
-        signal(SIGQUIT, SIG_IGN);
-        signal(SIGTSTP, SIG_IGN);
-        signal(SIGTTIN, SIG_IGN);
-        signal(SIGTTOU, SIG_IGN);
-
         if (WIFEXITED(status)) {
             return WEXITSTATUS(status);
         } else if (WIFSIGNALED(status)) {
             fprintf(stderr, "Child process terminated by signal %d\n", WTERMSIG(status));
-            return -1;
-        }else if (WIFSTOPPED(status)) {
-            fprintf(stderr, "Child process stopped by signal %d\n", WSTOPSIG(status));
+
             return -1;
         }
     }
