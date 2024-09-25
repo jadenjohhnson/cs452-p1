@@ -47,7 +47,7 @@ int main(int argc, char **argv)
         // fflush(stdout);
         // printf("%s\n", stdout);
         // printf("%s\n",readline(NULL));
-        printf("should print here\n");
+        // printf("should print here\n");
         // printf("%s", theShell.prompt);
         }
     }

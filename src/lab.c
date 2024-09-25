@@ -10,6 +10,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <sys/wait.h>
+#include <errno.h>
 
 char *get_prompt(const char *env){
 
@@ -224,38 +225,74 @@ void sh_destroy(struct shell *sh) {
     sh->shell_pgid = -1;
 }
 
-  int externalCommand(char **args) {
+//   int externalCommand(char **args) {
 
-    // Since the command was not built in, a new process must be created  
+//     // Since the command was not built in, a new process must be created  
+//     pid_t pid;
+//     int status;
+
+//     pid = fork();
+
+//     if (pid == 0) { // Child process
+
+//         // Execute the command using execvp
+//         if (execvp(args[0], args) == -1) {
+//             perror("execvp");
+//             exit(EXIT_FAILURE);
+//         } 
+//         else if (pid < 0) { // Fork failed
+//             perror("fork");
+//             return -1;
+//         } 
+//         else { // Parent process
+//             // Wait for the child process to complete
+//             if (waitpid(pid, &status, 0) == -1) {
+//                 printf("waiting rn\n");
+//                 perror("waitpid");
+//                 return -1;
+//             }
+
+//             if (WIFEXITED(status)) {
+//                 return WEXITSTATUS(status);
+//             } else {
+//                 return -1;
+//             }
+//         }
+//     }
+//     // printf("returning external\n");
+//     return 0;
+// }
+
+int externalCommand(char **args) {
     pid_t pid;
     int status;
 
     pid = fork();
 
-    if (pid == 0) { // Child process
-
+    if (pid < 0) { // Fork failed
+        perror("fork");
+        return -1;
+    } else if (pid == 0) { // Child process
         // Execute the command using execvp
         if (execvp(args[0], args) == -1) {
             perror("execvp");
             exit(EXIT_FAILURE);
-        } else if (pid < 0) { // Fork failed
-            perror("fork");
+        }
+    } else { // Parent process
+        // Wait for the child process to complete
+        if (waitpid(pid, &status, 0) == -1) {
+            if (errno == ECHILD) {
+                // Child has already terminated
+                return 0;  // Assume success if we can't get the actual status
+            }
+            printf("waitPIDERR\n");
+            perror("waitpid");
             return -1;
-        } else { // Parent process
-            // Wait for the child process to complete
-            if (waitpid(pid, &status, 0) == -1) {
-                printf("waiting rn\n");
-                perror("waitpid");
-                return -1;
-            }
+        }
 
-            if (WIFEXITED(status)) {
-                return WEXITSTATUS(status);
-            } else {
-                return -1;
-            }
+        if (WIFEXITED(status)) {
+            return WEXITSTATUS(status);
         }
     }
-    printf("returning external\n");
-    return 0;
+    return 0; // This should not be reached
 }
