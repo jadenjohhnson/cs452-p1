@@ -57,6 +57,21 @@ char **cmd_parse(char const *line) {
   char **args = NULL;
   long argMax = sysconf(_SC_ARG_MAX);
 
+  // Check if the last character is '&'
+  size_t len = strlen(lineCopy);
+  if (len > 0 && lineCopy[len - 1] == '&') {
+      backProc = 1;
+    if (lineCopy[len - 2] != ' '){
+        //fix the line to have a space before '&'
+        memmove(lineCopy + len - 1, lineCopy + len - 2, 1); // Shift
+        lineCopy[len - 1] = ' '; // Insert a space
+        lineCopy = realloc(lineCopy, strlen(lineCopy) + 10);
+        lineCopy[len] = '&';
+        lineCopy[len+ 1] = '\0';
+    }
+    // printf("line copy: %s\n", lineCopy);
+  }
+
   token = strtok(lineCopy, " \t\n");
   while (token != NULL && argsCount < argMax){
     args = realloc(args, sizeof(char*) * (argsCount +1));
@@ -78,10 +93,11 @@ char **cmd_parse(char const *line) {
   args = realloc(args, sizeof(char*) * (argsCount +2));
   args[argsCount] = NULL;
 
-// Store is_background as the last element
+    // Store is_background as the last element
   args[argsCount + 1] = (char*)(intptr_t)backProc;
 
   free(lineCopy);
+
   return args;
 }
 
@@ -154,7 +170,12 @@ bool do_builtin(struct shell *sh, char **argv) {
             printf("No command history available.\n");
         }
         return true;
-    } else if (strcmp(argv[0], "help") == 0) {
+    } else if (strcmp(argv[0], "jobs") == 0) {
+         for(int i = 0; i < sh->job_count; i++){
+            printf("[%d] %s\n", sh->jobs[i].id, sh->jobs[i].command);
+         }
+        return true;
+    }  else if (strcmp(argv[0], "help") == 0) {
         printf("Built-in commands:\n");
         printf("  exit - Exit the shell\n");
         printf("  cd [dir] - Change directory\n");
@@ -295,7 +316,7 @@ int externalCommand(struct shell *sh, char **args) {
         fprintf(stderr, "exec failed\n");
         exit(EXIT_FAILURE);
     } else { // Parent process
-        if(args[0] != NULL){
+        if (backProc && args[0] != NULL) {
             add_job(sh, pid, args[0], backProc);
         }
 
@@ -343,25 +364,36 @@ void check_background_jobs(struct shell *sh) {
         if (sh->jobs[i].is_background) {
             int status;
             pid_t result = waitpid(sh->jobs[i].pid, &status, WNOHANG);
-            if (result == sh->jobs[i].pid) {
+            if (result == -1) {
+                // Handle error, maybe remove the job if the process doesn't exist
+                printf("[%d] Done %s\n", sh->jobs[i].id, sh->jobs[i].command);
+                remove_job(sh, sh->jobs[i].id);
+            } else if (result == sh->jobs[i].pid) {
                 printf("[%d] Done %s\n", sh->jobs[i].id, sh->jobs[i].command);
                 remove_job(sh, sh->jobs[i].id);
                 i--; // Recheck this index as jobs have shifted
             }
+            // If result is 0, the process is still running
         }
-        printf("one job checked.\n");
+        // printf("One job checked.\n");
     }
 }
 
 void remove_job(struct shell *sh, int job_id) {
+    int found = -1;
     for (int i = 0; i < sh->job_count; i++) {
         if (sh->jobs[i].id == job_id) {
-            free(sh->jobs[i].command);
-            for (int j = i; j < sh->job_count - 1; j++) {
-                sh->jobs[j] = sh->jobs[j + 1];
-            }
-            sh->job_count--;
+            found = i;
             break;
         }
+    }
+    
+    if (found != -1) {
+        free(sh->jobs[found].command);
+        for (int j = found; j < sh->job_count - 1; j++) {
+            sh->jobs[j] = sh->jobs[j + 1];
+            sh->jobs[j].id--; // Adjust the ID of shifted jobs
+        }
+        sh->job_count--;
     }
 }
