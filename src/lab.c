@@ -11,6 +11,9 @@
 #include <readline/history.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <stdint.h>
+
+int backProc = 0;  // Indicate background process
 
 char *get_prompt(const char *env){
 
@@ -62,8 +65,22 @@ char **cmd_parse(char const *line) {
     token = strtok(NULL, " \t\n");
     
   }
-  args = realloc(args, sizeof(char*) * (argsCount +1));
+
+  // Check if the last argument is '&'
+  if (argsCount > 0 && strcmp(args[argsCount - 1], "&") == 0) {
+    free(args[argsCount - 1]);  // Free the '&' token
+    argsCount--;
+    backProc = 1;
+  } else{
+    backProc = 0;
+  }
+
+  args = realloc(args, sizeof(char*) * (argsCount +2));
   args[argsCount] = NULL;
+
+// Store is_background as the last element
+  args[argsCount + 1] = (char*)(intptr_t)backProc;
+
   free(lineCopy);
   return args;
 }
@@ -160,6 +177,15 @@ void sh_init(struct shell *sh) {
     sh->shell_terminal = STDIN_FILENO;
     sh->shell_is_interactive = isatty(sh->shell_terminal);
 
+    // Initialize job list
+    sh->job_count = 0;
+    for (int i = 0; i < MAX_JOBS; i++) {
+        sh->jobs[i].id = 0;
+        sh->jobs[i].pid = 0;
+        sh->jobs[i].command = NULL;
+        sh->jobs[i].is_background = 0;
+    }
+
     if (sh->shell_is_interactive) {
         // Loop until we are in the foreground
         while (tcgetpgrp(sh->shell_terminal) != (sh->shell_pgid = getpgrp())) {
@@ -202,6 +228,19 @@ void sh_destroy(struct shell *sh) {
         free(sh->prompt);
         sh->prompt = NULL;
     }
+
+    // Clean up job list
+    for (int i = 0; i < sh->job_count; i++) {
+        if (sh->jobs[i].command != NULL) {
+            free(sh->jobs[i].command);
+            sh->jobs[i].command = NULL;
+        }
+        // Optionally, you might want to kill any remaining background processes
+        if (sh->jobs[i].is_background && sh->jobs[i].pid > 0) {
+            kill(sh->jobs[i].pid, SIGTERM);
+        }
+    }
+    sh->job_count = 0;
 
     // If the shell is interactive, restore the terminal settings
     if (sh->shell_is_interactive) {
@@ -248,32 +287,81 @@ int externalCommand(struct shell *sh, char **args) {
         signal(SIGTTOU, SIG_DFL);
 
         // Execute the command
-        execvp(args[0], args);
-        
+        if(args[0] != NULL){
+            execvp(args[0], args);
+        }
+
         // If execvp returns, it must have failed
         fprintf(stderr, "exec failed\n");
         exit(EXIT_FAILURE);
     } else { // Parent process
-        // Wait for the child process to complete
-        if (waitpid(pid, &status, 0) == -1) {
-            if (errno == ECHILD) {
-                // Child has already terminated
-                return 0;  // Assume success if we can't get the actual status
-            }
-            perror("waitpid");
-            return -1;
+        if(args[0] != NULL){
+            add_job(sh, pid, args[0], backProc);
         }
 
-        // Give control back to the shell
-        tcsetpgrp(sh->shell_terminal, sh->shell_pgid);
+        if (!backProc) {
+            // Wait for the child process to complete
+            if (waitpid(pid, &status, 0) == -1) {
+                if (errno == ECHILD) {
+                    // Child has already terminated
+                    return 0;  // Assume success if we can't get the actual status
+                }
+                perror("waitpid");
+                return -1;
+            }
 
-        if (WIFEXITED(status)) {
-            return WEXITSTATUS(status);
-        } else if (WIFSIGNALED(status)) {
-            fprintf(stderr, "Child process terminated by signal %d\n", WTERMSIG(status));
+            // Give control back to the shell
+            tcsetpgrp(sh->shell_terminal, sh->shell_pgid);
 
-            return -1;
+            if (WIFEXITED(status)) {
+                return WEXITSTATUS(status);
+            } else if (WIFSIGNALED(status)) {
+                fprintf(stderr, "Child process terminated by signal %d\n", WTERMSIG(status));
+
+                return -1;
+            }
         }
     }
     return 0; // This should not be reached
+}
+
+void add_job(struct shell *sh, pid_t pid, char *command, int is_background) {
+    if (sh->job_count < MAX_JOBS) {
+        sh->jobs[sh->job_count].id = sh->job_count + 1;
+        sh->jobs[sh->job_count].pid = pid;
+        sh->jobs[sh->job_count].command = strdup(command);
+        sh->jobs[sh->job_count].is_background = is_background;
+        if (is_background) {
+            printf("[%d] %d %s\n", sh->jobs[sh->job_count].id, pid, command);
+        }
+        sh->job_count++;
+    }
+}
+
+void check_background_jobs(struct shell *sh) {
+    for (int i = 0; i < sh->job_count; i++) {
+        if (sh->jobs[i].is_background) {
+            int status;
+            pid_t result = waitpid(sh->jobs[i].pid, &status, WNOHANG);
+            if (result == sh->jobs[i].pid) {
+                printf("[%d] Done %s\n", sh->jobs[i].id, sh->jobs[i].command);
+                remove_job(sh, sh->jobs[i].id);
+                i--; // Recheck this index as jobs have shifted
+            }
+        }
+        printf("one job checked.\n");
+    }
+}
+
+void remove_job(struct shell *sh, int job_id) {
+    for (int i = 0; i < sh->job_count; i++) {
+        if (sh->jobs[i].id == job_id) {
+            free(sh->jobs[i].command);
+            for (int j = i; j < sh->job_count - 1; j++) {
+                sh->jobs[j] = sh->jobs[j + 1];
+            }
+            sh->job_count--;
+            break;
+        }
+    }
 }

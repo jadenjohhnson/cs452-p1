@@ -43,9 +43,11 @@ int main(int argc, char **argv)
 
       if (externResult != 0) {
             fprintf(stderr, "External Command failed, status: %d\n", externResult);
-        } else {
         }
     }
+
+    check_background_jobs(&theShell);
+    // printf("Jobs checked.\n");
 
     cmd_free(args);
     free(line);

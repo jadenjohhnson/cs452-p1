@@ -15,7 +15,6 @@ extern "C"
 {
 #endif
 
-  // Add these to lab.h
   #define MAX_JOBS 20
 
   struct job {
