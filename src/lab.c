@@ -97,10 +97,15 @@ char **cmd_parse(char const *line) {
     if (temp) {
         args = temp;
         args[argsCount] = NULL;
+    }else {
+        fprintf(stderr, "Memory allocation failed\n");
+        cmd_free(args);
+        free(lineCopy);
+        return NULL; // Return NULL on failure
     }
   args[argsCount] = NULL;
 
-  // Store backProc as the last element
+//   Store backProc as the last element
 //   args[argsCount + 1] = (char*)(intptr_t)backProc;
 
   free(lineCopy);
@@ -112,6 +117,7 @@ void cmd_free(char **line) {
   if (line == NULL) return;
 
   for(int i = 0; line[i] != NULL; i++){
+    // printf("%s\n",line[i]);
     free(line[i]);
   }
   free(line);
@@ -124,7 +130,7 @@ char *trim_white(char *line) {
 
 // If the line is all whitespace, return an empty string
 if (*line == 0) {
-    return strdup("");  // Allocate and return an empty string
+    return "";  // Allocate and return an empty string
 }
 
   char *lineEnd = line + strlen(line) -1;

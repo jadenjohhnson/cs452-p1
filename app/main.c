@@ -50,7 +50,6 @@ int main(int argc, char **argv)
     // printf("Jobs checked.\n");
 
     free(line);
-    free(lineTrimmed);
     cmd_free(args);
   }
 
