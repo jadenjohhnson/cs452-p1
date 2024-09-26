@@ -65,11 +65,13 @@ char **cmd_parse(char const *line) {
         //fix the line to have a space before '&'
         memmove(lineCopy + len - 1, lineCopy + len - 2, 1); // Shift
         lineCopy[len - 1] = ' '; // Insert a space
-        lineCopy = realloc(lineCopy, strlen(lineCopy) + 10);
-        lineCopy[len] = '&';
-        lineCopy[len+ 1] = '\0';
+        char *newLineCopy = realloc(lineCopy, strlen(lineCopy) + 10);
+        if (newLineCopy) {
+            lineCopy = newLineCopy;  // Update lineCopy only if realloc is successful
+            lineCopy[len] = '&';
+            lineCopy[len + 1] = '\0';
+        }
     }
-    // printf("line copy: %s\n", lineCopy);
   }
 
   token = strtok(lineCopy, " \t\n");
@@ -90,11 +92,16 @@ char **cmd_parse(char const *line) {
     backProc = 0;
   }
 
-  args = realloc(args, sizeof(char*) * (argsCount +2));
+//   args = realloc(args, sizeof(char*) * (argsCount +1));
+    char **temp = realloc(args, sizeof(char*) * (argsCount + 1));
+    if (temp) {
+        args = temp;
+        args[argsCount] = NULL;
+    }
   args[argsCount] = NULL;
 
-    // Store is_background as the last element
-  args[argsCount + 1] = (char*)(intptr_t)backProc;
+  // Store backProc as the last element
+//   args[argsCount + 1] = (char*)(intptr_t)backProc;
 
   free(lineCopy);
 

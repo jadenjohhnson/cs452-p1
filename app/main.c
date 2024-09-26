@@ -49,8 +49,9 @@ int main(int argc, char **argv)
     check_background_jobs(&theShell);
     // printf("Jobs checked.\n");
 
-    cmd_free(args);
     free(line);
+    free(lineTrimmed);
+    cmd_free(args);
   }
 
   sh_destroy(&theShell);
